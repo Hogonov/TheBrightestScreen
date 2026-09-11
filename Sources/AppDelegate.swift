@@ -4,6 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let controller = BrightnessController()
     private(set) var statusItem: NSStatusItem!
+    private var statusVisibilityObservation: NSKeyValueObservation?
     private var menuIsOpen = false
     private var menuPresentationPending = false
     private let toggleItem = NSMenuItem(title: "Включить XDR", action: #selector(toggle), keyEquivalent: "")
@@ -32,10 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if smokeTest { startSmokeTest() }
         else if CommandLine.arguments.contains("--enable") { controller.maximize() }
         updateMenu()
-        if !smokeTest && !CommandLine.arguments.contains("--enable") { showControls() }
     }
 
-    func applicationWillTerminate(_ notification: Notification) { controller.disable() }
+    func applicationWillTerminate(_ notification: Notification) {
+        statusVisibilityObservation = nil
+        controller.disable()
+    }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         showControls()
@@ -62,7 +65,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.autosaveName = "BrighterStatusItem"
+        // The menu bar is the app's primary interface throughout its lifetime.
+        statusItem.behavior = []
         statusItem.isVisible = true
+        statusVisibilityObservation = statusItem.observe(\.isVisible, options: [.new]) { [weak self] _, change in
+            guard change.newValue == false else { return }
+            // Avoid changing the property inside its own KVO notification.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.statusVisibilityObservation != nil else { return }
+                self.statusItem.isVisible = true
+            }
+        }
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.delegate = self

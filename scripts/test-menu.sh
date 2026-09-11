@@ -10,6 +10,6 @@ done
 xcrun swiftc -swift-version 5 -module-cache-path "$PROJECT_DIR/build/module-cache" \
   -framework AppKit -framework MetalKit -framework CoreGraphics \
   "${sources[@]}" Tests/MenuTests.swift -o build/menu-tests
-# Requires a logged-in macOS GUI session. Opens and dismisses two menus;
+# Requires a logged-in macOS GUI session. Opens and dismisses one menu;
 # does not enable XDR or change native brightness.
 build/menu-tests

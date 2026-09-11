@@ -8,7 +8,8 @@ enum MenuTests {
         let delegate = AppDelegate()
         app.delegate = delegate
         var openedMenus = 0
-        var hiddenForReopen = false
+        var quietLaunch = false
+        var automaticallyRestored = false
         let observer = NotificationCenter.default.addObserver(
             forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main
         ) { notification in
@@ -19,20 +20,26 @@ enum MenuTests {
             RunLoop.main.add(timer, forMode: .common)
         }
         let timer = Timer(timeInterval: 1, repeats: false) { _ in
+            quietLaunch = openedMenus == 0 && delegate.statusItem.isVisible
             delegate.statusItem.isVisible = false
-            hiddenForReopen = !delegate.statusItem.isVisible
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        let reopen = Timer(timeInterval: 2, repeats: false) { _ in
+            // Restoration must happen on its own, before any reopen event.
+            automaticallyRestored = delegate.statusItem.isVisible && openedMenus == 0
             // Visible windows can include HDR trigger windows; they must not
             // prevent recovery. Repeated events must not nest popup menus.
             _ = delegate.applicationShouldHandleReopen(app, hasVisibleWindows: true)
             _ = delegate.applicationShouldHandleReopen(app, hasVisibleWindows: true)
         }
-        RunLoop.main.add(timer, forMode: .common)
-        let finish = Timer(timeInterval: 3, repeats: false) { _ in
+        RunLoop.main.add(reopen, forMode: .common)
+        let finish = Timer(timeInterval: 4, repeats: false) { _ in
             let visible = delegate.statusItem.isVisible
             let icon = delegate.statusItem.button?.image != nil
             let brightnessUntouched = !delegate.controller.enabled
-            let passed = openedMenus == 2 && hiddenForReopen && visible && icon && brightnessUntouched
-            print("MENU RESULT openings=\(openedMenus) hiddenForReopen=\(hiddenForReopen) visible=\(visible) icon=\(icon) brightnessUntouched=\(brightnessUntouched)")
+            let nonRemovable = !delegate.statusItem.behavior.contains(.removalAllowed)
+            let passed = openedMenus == 1 && quietLaunch && automaticallyRestored && visible && icon && nonRemovable && brightnessUntouched
+            print("MENU RESULT openings=\(openedMenus) quietLaunch=\(quietLaunch) automaticallyRestored=\(automaticallyRestored) visible=\(visible) icon=\(icon) nonRemovable=\(nonRemovable) brightnessUntouched=\(brightnessUntouched)")
             fflush(stdout)
             NotificationCenter.default.removeObserver(observer)
             exit(passed ? 0 : 1)
