@@ -3,7 +3,9 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let controller = BrightnessController()
-    private var statusItem: NSStatusItem!
+    private(set) var statusItem: NSStatusItem!
+    private var menuIsOpen = false
+    private var menuPresentationPending = false
     private let toggleItem = NSMenuItem(title: "Включить XDR", action: #selector(toggle), keyEquivalent: "")
     private let statusLabel = NSTextField(wrappingLabelWithString: "Готов к включению")
     private let boostLabel = NSTextField(labelWithString: "Усиление XDR · 100%")
@@ -30,12 +32,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if smokeTest { startSmokeTest() }
         else if CommandLine.arguments.contains("--enable") { controller.maximize() }
         updateMenu()
+        if !smokeTest && !CommandLine.arguments.contains("--enable") { showControls() }
     }
 
     func applicationWillTerminate(_ notification: Notification) { controller.disable() }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        showControls()
+        return false
+    }
+
+    private func showControls() {
+        guard let statusItem else { return }
+        statusItem.isVisible = true
+        updateMenu()
+        guard !menuIsOpen, !menuPresentationPending else { return }
+        menuPresentationPending = true
+        // A visible status item can still be clipped by a crowded menu bar or
+        // the camera housing. Opening the app must provide access independently.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.menuPresentationPending = false
+            guard !self.menuIsOpen else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            self.statusItem.menu?.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
+    }
+
     private func buildMenu() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.autosaveName = "BrighterStatusItem"
+        statusItem.isVisible = true
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.delegate = self
@@ -85,7 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
     }
 
-    func menuWillOpen(_ menu: NSMenu) { updateMenu() }
+    func menuWillOpen(_ menu: NSMenu) { menuIsOpen = true; updateMenu() }
+    func menuDidClose(_ menu: NSMenu) { menuIsOpen = false }
 
     private func updateMenu() {
         guard statusItem != nil else { return }
