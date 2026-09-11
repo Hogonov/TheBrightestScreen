@@ -168,7 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showAbout() {
         let alert = NSAlert()
-        alert.messageText = "Brighter 1.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        alert.messageText = "Brighter \(version)"
         alert.informativeText = "Бесплатное приложение для XDR-яркости.\n\n«Максимальная яркость» поднимает системную яркость и включает усиление XDR. Клавиши яркости продолжают работать. При выключении исходная яркость возвращается, если вы не изменили её вручную.\n\nДоступный максимум регулирует macOS.\nОсновано на подходе BrightIntosh · GPL-3.0."
         alert.runModal()
     }

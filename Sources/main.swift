@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import AppKit
 
+// Keep UI tests and direct diagnostic runs out of the production menu-bar
+// identity: Tahoe can attribute their items to the app hosting the shell.
+guard let identifier = Bundle.main.bundleIdentifier else {
+    fputs("Open the built Brighter.app bundle instead of an unbundled executable.\n", stderr)
+    exit(64)
+}
+let smokeTest = CommandLine.arguments.contains("--smoke-test")
+if smokeTest && identifier != "local.alexandr.Brighter.Diagnostics" {
+    fputs("Run bash scripts/build.sh --test, then build/BrighterDiagnostics.app/Contents/MacOS/Brighter --smoke-test.\n", stderr)
+    exit(64)
+}
 let app = NSApplication.shared
 if CommandLine.arguments.contains("--diagnose") {
     print("Current display state (read-only probe):")
@@ -11,12 +22,28 @@ if CommandLine.arguments.contains("--diagnose") {
     exit(0)
 }
 
-let identifier = Bundle.main.bundleIdentifier ?? "local.alexandr.Brighter"
-let alreadyRunning = NSWorkspace.shared.runningApplications.first {
-    $0.bundleIdentifier == identifier && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+let runningApps = NSWorkspace.shared.runningApplications.filter {
+    $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+}
+let productionIdentifiers = ["local.alexandr.Brighter", "local.alexandr.BrighterStandalone"]
+if smokeTest && runningApps.contains(where: { productionIdentifiers.contains($0.bundleIdentifier ?? "") }) {
+    fputs("Close the running Brighter before starting the smoke test.\n", stderr)
+    exit(2)
+}
+if identifier == "local.alexandr.BrighterStandalone",
+   runningApps.contains(where: { $0.bundleIdentifier == "local.alexandr.Brighter" }) {
+    let alert = NSAlert()
+    alert.messageText = "Закройте предыдущую версию Brighter"
+    alert.informativeText = "Выберите «Выключить и выйти» в старой версии, затем откройте Brighter снова. Это позволит восстановить яркость перед обновлением."
+    app.activate(ignoringOtherApps: true)
+    alert.runModal()
+    exit(2)
+}
+let alreadyRunning = runningApps.first {
+    $0.bundleIdentifier == identifier
 }
 if let alreadyRunning {
-    if CommandLine.arguments.contains("--smoke-test") {
+    if smokeTest {
         print("Close the running Brighter before starting the smoke test.")
         exit(2)
     }
@@ -33,6 +60,6 @@ if let alreadyRunning {
     app.run()
     exit(0)
 }
-let delegate = AppDelegate(smokeTest: CommandLine.arguments.contains("--smoke-test"))
+let delegate = AppDelegate(smokeTest: smokeTest)
 app.delegate = delegate
 app.run()

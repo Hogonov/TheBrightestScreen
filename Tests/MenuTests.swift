@@ -4,6 +4,8 @@ import AppKit
 @main
 enum MenuTests {
     static func main() {
+        precondition(Bundle.main.bundleIdentifier == "local.alexandr.Brighter.MenuTests",
+                     "UI tests must never register the production menu-bar identity")
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
